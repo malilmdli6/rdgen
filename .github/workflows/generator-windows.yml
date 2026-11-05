@@ -1,3 +1,4 @@
+# force trigger github index
 name: Custom Windows Client Generator
 run-name: Custom Windows Client Generator
 on: 
