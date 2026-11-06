@@ -756,17 +756,37 @@ jobs:
         run: |
           mv ./SignOutput/rustdesk.msi "./SignOutput/${{ env.filename }}.msi" || echo "rustdesk"
 
-      # 编译完成后，替换原来回传步骤的地方
-      - name: Create Encrypted ZIP Archive
-        shell: bash
-        run: |
-          # 7z 命令加密打包，密码从 GitHub Secrets 中读取，更加安全
-          7z a -p"${{ secrets.ZIP_PASSWORD }}" ./SignOutput/Encrypted_Client.zip ./SignOutput/*.exe ./SignOutput/*.msi
-
-      - name: Upload Final Artifact to GitHub
-        uses: actions/upload-artifact@v4
+      - name: send file to rdgen server
+        if: ${{ env.rdgen == 'true' }}
+        uses: nick-fields/retry@v3
         with:
-          name: 1.5.1.1-encrypted
-          path: ./SignOutput/Encrypted_Client.zip
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 15
+          shell: bash
+          command: |
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client || true
 
+      - name: send file to api server
+        if: ${{ env.rdgen == 'false' }}
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 15
+          shell: bash
+          command: |
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" ${{ env.apiServer }}/api/save_custom_client
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" ${{ env.apiServer }}/api/save_custom_client || true
+
+  cleanup:
+    needs: [build-for-windows-flutter]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    if: always()
+    steps:
+      - name: Delete secrets artifact
+        uses: geekyeggo/delete-artifact@v5
+        with:
           name: encrypted-secrets-zip
