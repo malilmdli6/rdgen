@@ -297,7 +297,6 @@ jobs:
           sed -i -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ env.appname }}.exe"|' ./libs/portable/Cargo.toml
           sed -i -e 's|const APP_PREFIX: \&str = "rustdesk";|const APP_PREFIX: \&str = "${{ env.appname }}";|' ./libs/portable/src/main.rs
           find ./src/lang -name "*.rs" -exec sed -i -e 's|RustDesk|${{ env.appname }}|' {} \;
-          sed -i -e '/-p tmpdeb\/usr\/lib\/rustdesk/d' ./build.py
 
       - name: change company name
         if: env.compname != 'Purslane Ltd'
@@ -379,6 +378,12 @@ jobs:
             wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/removeSetupServerTip.diff
             git apply removeSetupServerTip.diff
             echo -n '${{ env.custom }}' > ./custom_.txt
+
+      - name: apply theme colors
+        shell: bash
+        run: |
+          wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/themeColors.py
+          python themeColors.py
           
       - name: change url to custom
         if: env.urlLink != 'https://rustdesk.com'
@@ -407,10 +412,14 @@ jobs:
         if: ${{ env.delayFix == 'true' }}
         shell: bash
         run: |
-          # Precise fix: only extend the direct-connection condition with the
-          # key check, instead of globally replacing !key.is_empty() with
-          # false (which would also disable TCP encryption and UDP logic).
-          sed -i -e 's#if is_local || peer_nat_type == NatType::SYMMETRIC {#if is_local || peer_nat_type == NatType::SYMMETRIC || !key.is_empty() {#' ./src/client.rs
+          # Skip the optional secure_tcp handshake to the rendezvous server.
+          # The open-source rustdesk-server never sends KeyExchange, so when an
+          # access_token is set (third-party API login) the client waits for
+          # READ_TIMEOUT and fails with:
+          # "Failed to secure tcp: deadline has elapsed: Please try later(0)".
+          # Matches DVForge's delay fix. Safe on 1.4.x-1.5.x/master: the only
+          # !key.is_empty() occurrences in client.rs are the two secure_tcp gates.
+          sed -i -e 's|!key.is_empty()|false|' ./src/client.rs
           grep -n "key.is_empty()" ./src/client.rs || true
 
       - name: use X for offline display instead of orange circle
@@ -422,8 +431,8 @@ jobs:
           retry_wait_seconds: 15
           shell: bash
           command: |
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.diff
-            git apply xoffline.diff
+            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.py
+            python xoffline.py
 
       - name: hide-cm
         if: env.hidecm == 'true'
@@ -1018,7 +1027,6 @@ jobs:
           sed -i -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ env.appname }}.exe"|' ./libs/portable/Cargo.toml
           sed -i -e 's|const APP_PREFIX: \&str = "rustdesk";|const APP_PREFIX: \&str = "${{ env.appname }}";|' ./libs/portable/src/main.rs
           find ./src/lang -name "*.rs" -exec sed -i -e 's|RustDesk|${{ env.appname }}|' {} \;
-          sed -i -e '/-p tmpdeb\/usr\/lib\/rustdesk/d' ./build.py
 
       - name: change company name
         if: env.compname != 'Purslane Ltd'
@@ -1100,6 +1108,12 @@ jobs:
             wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/removeSetupServerTip.diff
             git apply removeSetupServerTip.diff
             echo -n '${{ env.custom }}' > ./custom_.txt
+
+      - name: apply theme colors
+        shell: bash
+        run: |
+          wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/themeColors.py
+          python themeColors.py
           
       - name: change url to custom
         if: env.urlLink != 'https://rustdesk.com'
@@ -1128,10 +1142,14 @@ jobs:
         if: ${{ env.delayFix == 'true' }}
         shell: bash
         run: |
-          # Precise fix: only extend the direct-connection condition with the
-          # key check, instead of globally replacing !key.is_empty() with
-          # false (which would also disable TCP encryption and UDP logic).
-          sed -i -e 's#if is_local || peer_nat_type == NatType::SYMMETRIC {#if is_local || peer_nat_type == NatType::SYMMETRIC || !key.is_empty() {#' ./src/client.rs
+          # Skip the optional secure_tcp handshake to the rendezvous server.
+          # The open-source rustdesk-server never sends KeyExchange, so when an
+          # access_token is set (third-party API login) the client waits for
+          # READ_TIMEOUT and fails with:
+          # "Failed to secure tcp: deadline has elapsed: Please try later(0)".
+          # Matches DVForge's delay fix. Safe on 1.4.x-1.5.x/master: the only
+          # !key.is_empty() occurrences in client.rs are the two secure_tcp gates.
+          sed -i -e 's|!key.is_empty()|false|' ./src/client.rs
           grep -n "key.is_empty()" ./src/client.rs || true
 
       - name: use X for offline display instead of orange circle
@@ -1143,8 +1161,8 @@ jobs:
           retry_wait_seconds: 15
           shell: bash
           command: |
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.diff
-            git apply xoffline.diff
+            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.py
+            python xoffline.py
 
       - name: hide-cm
         if: env.hidecm == 'true'
@@ -1335,7 +1353,6 @@ jobs:
                 for FILE in $(echo $FILES | sed "s/\n/ /g"); do
                   sed -ie "s|rustdesk|${{ env.appname }}|g" $FILE
                 done
-                mkdir -p %{buildroot}/tmpdeb/usr/lib/rustdesk
                 for file in "./res/rpm-flutter.spec" "./res/rpm-flutter-suse.spec"; do
                   sed -ie "s|^\(URL:\s*\).*|\1${{ env.downloadLink }}|g" "$file"
                   sed -ie "s|^\(Vendor:\s*\).*|\1${{ env.compname }}|g" "$file"
